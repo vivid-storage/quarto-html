@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.433">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Hiroaki Yutani">
+<meta name="dcterms.date" content="2021-09-21">
+<meta name="description" content="configure.win and configure">
+
+<title>Wannabe Rstats-fu - Writing A Configure Script For An R Package Using Rust</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../assets/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<meta name="twitter:title" content="Wannabe Rstats-fu - Writing A Configure Script For An R Package Using Rust">
+<meta name="twitter:description" content="configure.win and configure">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Wannabe Rstats-fu</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html" rel="" target="">
+ <span class="menu-text">About</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/yutannihilat_en" rel="" target=""><i class="bi bi-twitter" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/yutannihilation" rel="" target=""><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+            <div class="quarto-navbar-tools">
+</div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default toc-left page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Writing A Configure Script For An R Package Using Rust</h1>
+                  <div>
+        <div class="description">
+          <p><code>configure.win</code> and <code>configure</code></p>
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Rust</div>
+                <div class="quarto-category">extendr</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Hiroaki Yutani </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">September 21, 2021</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation floating overflow-auto">
+    <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#tweak-makevars.win" id="toc-tweak-makevars.win" class="nav-link active" data-scroll-target="#tweak-makevars.win">Tweak <code>Makevars.win</code></a>
+  <ul class="collapse">
+  <li><a href="#set-cargo_home" id="toc-set-cargo_home" class="nav-link" data-scroll-target="#set-cargo_home">Set <code>CARGO_HOME</code></a></li>
+  <li><a href="#not_cran-environmental-variable" id="toc-not_cran-environmental-variable" class="nav-link" data-scroll-target="#not_cran-environmental-variable"><code>NOT_CRAN</code> environmental variable</a></li>
+  <li><a href="#set-path" id="toc-set-path" class="nav-link" data-scroll-target="#set-path">Set <code>PATH</code></a></li>
+  </ul></li>
+  <li><a href="#what-is-a-configure-script" id="toc-what-is-a-configure-script" class="nav-link" data-scroll-target="#what-is-a-configure-script">What is a configure script?</a></li>
+  <li><a href="#biarch-true" id="toc-biarch-true" class="nav-link" data-scroll-target="#biarch-true"><code>Biarch: true</code></a></li>
+  <li><a href="#check-cargo" id="toc-check-cargo" class="nav-link" data-scroll-target="#check-cargo">Check <code>cargo</code></a>
+  <ul class="collapse">
+  <li><a href="#check-cargo-is-installed" id="toc-check-cargo-is-installed" class="nav-link" data-scroll-target="#check-cargo-is-installed">Check <code>cargo</code> is installed</a></li>
+  <li><a href="#check-if-the-rust-version-is-not-too-old-to-support" id="toc-check-if-the-rust-version-is-not-too-old-to-support" class="nav-link" data-scroll-target="#check-if-the-rust-version-is-not-too-old-to-support">Check if the Rust version is not too old to support</a></li>
+  <li><a href="#check-if-the-rust-installation-has-the-required-toolchain-and-targets-windows-only" id="toc-check-if-the-rust-installation-has-the-required-toolchain-and-targets-windows-only" class="nav-link" data-scroll-target="#check-if-the-rust-installation-has-the-required-toolchain-and-targets-windows-only">Check if the Rust installation has the required toolchain and targets (Windows only)</a></li>
+  </ul></li>
+  <li><a href="#but-what-can-we-do" id="toc-but-what-can-we-do" class="nav-link" data-scroll-target="#but-what-can-we-do">But what can we do?</a></li>
+  <li><a href="#install-cargo-on-the-fly" id="toc-install-cargo-on-the-fly" class="nav-link" data-scroll-target="#install-cargo-on-the-fly">Install <code>cargo</code> on the fly</a></li>
+  <li><a href="#download-the-precompiled-binaries" id="toc-download-the-precompiled-binaries" class="nav-link" data-scroll-target="#download-the-precompiled-binaries">Download the precompiled binaries</a>
+  <ul class="collapse">
+  <li><a href="#makevars.in-and-makevars.win.in" id="toc-makevars.in-and-makevars.win.in" class="nav-link" data-scroll-target="#makevars.in-and-makevars.win.in"><code>Makevars.in</code> and <code>Makevars.win.in</code></a></li>
+  <li><a href="#verify-the-checksums" id="toc-verify-the-checksums" class="nav-link" data-scroll-target="#verify-the-checksums">Verify the checksums</a></li>
+  </ul></li>
+  <li><a href="#most-important-ask-cran-maintainers-to-exclude-solaris" id="toc-most-important-ask-cran-maintainers-to-exclude-solaris" class="nav-link" data-scroll-target="#most-important-ask-cran-maintainers-to-exclude-solaris">[MOST IMPORTANT!] Ask CRAN maintainers to exclude Solaris</a></li>
+  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  </ul>
+</nav>
+</nav>
+<div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+<p>I’ve been struggling with <code>configure.win</code> for several days. I think I’ve done, but it seems I’ve come too far from <a href="https://yutani.rbind.io/post/2021-08-01-unofficial-introduction-to-extendr-appendix-i-setup-github-actions-ci-and-more/#provide-precompiled-binaries-for-windows">the last post</a>. So, let me try to explain what a <code>configure.win</code> (or <code>configure</code>) would look like.</p>
+<p>Let’s start with this <code>Makevars.win</code>, basically the same one on the last blog post.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="dt">CRATE </span><span class="ch">=</span><span class="st"> string2path</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="dt">BASE_TAG </span><span class="ch">=</span><span class="st"> windows_20210801-3</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="dt">TARGET </span><span class="ch">=</span><span class="st"> </span><span class="ch">$(</span><span class="kw">subst</span><span class="st"> 64</span><span class="kw">,</span><span class="st">x86_64</span><span class="kw">,</span><span class="ch">$(</span><span class="kw">subst</span><span class="st"> 32</span><span class="kw">,</span><span class="st">i686</span><span class="kw">,</span><span class="ch">$(</span><span class="dt">WIN</span><span class="ch">)))</span><span class="st">-pc-windows-gnu</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="dt">LIBDIR </span><span class="ch">=</span><span class="st"> ./rust/target/</span><span class="ch">$(</span><span class="dt">TARGET</span><span class="ch">)</span><span class="st">/release</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="dt">STATLIB </span><span class="ch">=</span><span class="st"> </span><span class="ch">$(</span><span class="dt">LIBDIR</span><span class="ch">)</span><span class="st">/libstring2path.a</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="dt">PKG_LIBS </span><span class="ch">=</span><span class="st"> -L</span><span class="ch">$(</span><span class="dt">LIBDIR</span><span class="ch">)</span><span class="st"> -lstring2path -lws2_32 -ladvapi32 -luserenv</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># c.f. https://stackoverflow.com/a/34756868</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="dt">CARGO_EXISTS </span><span class="ch">:=</span><span class="st"> </span><span class="ch">$(</span><span class="kw">shell</span><span class="st"> cargo --version 2&gt; /dev/null</span><span class="ch">)</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="dv">all:</span><span class="dt"> C_clean</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="dv">$(SHLIB):</span><span class="dt"> </span><span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="dv">$(STATLIB):</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="cf">ifdef</span> CARGO_EXISTS</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    cargo build <span class="dt">--target</span><span class="ch">=$(</span><span class="dt">TARGET</span><span class="ch">)</span><span class="st"> --lib --release --manifest-path=./rust/Cargo.toml</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    mkdir -p <span class="ch">$(</span><span class="dt">LIBDIR</span><span class="ch">)</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    curl -L -o <span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span> https://github.com/yutannihilation/<span class="ch">$(</span><span class="dt">CRATE</span><span class="ch">)</span>/releases/download/<span class="ch">$(</span><span class="dt">BASE_TAG</span><span class="ch">)</span>/<span class="ch">$(</span><span class="dt">TARGET</span><span class="ch">)</span>-lib<span class="ch">$(</span><span class="dt">CRATE</span><span class="ch">)</span>.a</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="cf">endif</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="dv">C_clean:</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">SHLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">OBJECTS</span><span class="ch">)</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="dv">clean:</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">SHLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">OBJECTS</span><span class="ch">)</span> rust/target</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="tweak-makevars.win" class="level2">
+<h2 class="anchored" data-anchor-id="tweak-makevars.win">Tweak <code>Makevars.win</code></h2>
+<p>Before talking about configure scripts, I have to write a bit about <code>Makevars.win</code> (and <code>Makevars</code>) because it has something to be fixed.</p>
+<section id="set-cargo_home" class="level3">
+<h3 class="anchored" data-anchor-id="set-cargo_home">Set <code>CARGO_HOME</code></h3>
+<p>Can you see what part is wrong in the above <code>Makevars.win</code>? After the first CRAN submission of this package, I got this reply:</p>
+<blockquote class="blockquote">
+<p>Checking this creates ~/.cargo sized 82MB, in violation of the CRAN Policy. Please fix as necessary and resubmit.</p>
+</blockquote>
+<p><a href="https://cran.r-project.org/web/packages/policies.html">The CRAN Policy</a> says:</p>
+<blockquote class="blockquote">
+<ul>
+<li>Packages should not write in the user’s home filespace (including clipboards), nor anywhere else on the file system apart from the R session’s temporary directory (or during installation in the location pointed to by TMPDIR: and such usage should be cleaned up).</li>
+</ul>
+</blockquote>
+<p>By default, <code>cargo</code> uses <code>~/.cargo</code> for caching various things like the crates.io index and the dependency crates. Apparently, this is not allowed. To avoid this, we can set <code>CARGO_HOME</code> to the package’s local directory, like <a href="https://github.com/r-rust/gifski/blob/6b86cc6b60abbc2294db821f27cae37413df70c2/src/Makevars#L10">gifski package does</a>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>export <span class="dt">CARGO_HOME</span><span class="ch">=$(</span><span class="dt">PWD</span><span class="ch">)</span><span class="st">/.cargo</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Alternatively, we can set this on the head of the line of <code>cargo build</code> directly.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="dt">CARGO_HOME</span><span class="ch">=$(</span><span class="dt">PWD</span><span class="ch">)</span><span class="st">/.cargo</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>...snip...</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">CARGO_HOME</span><span class="ch">=$(</span><span class="dt">PWD</span><span class="ch">)</span><span class="st">/.cargo cargo build --target=</span><span class="ch">$(</span><span class="dt">TARGET</span><span class="ch">)</span><span class="st"> --lib --release --manifest-path=./rust/Cargo.toml</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>In addition to this, as it “should be cleaned up,” we also need to add these two lines after <code>cargo build</code>:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">CARGO_HOME</span><span class="ch">)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">LIBDIR</span><span class="ch">)</span>/build</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>But, this is a bit painful in terms of development. Why do I need to compile it always from scratch even on my local??</p>
+</section>
+<section id="not_cran-environmental-variable" class="level3">
+<h3 class="anchored" data-anchor-id="not_cran-environmental-variable"><code>NOT_CRAN</code> environmental variable</h3>
+<p>Fortunately, devtools utilities provide <code>NOT_CRAN</code> envvar to distinguish CRAN and other environment. So, maybe we can determine whether to set <code>CARGO_HOME</code>, depending on <code>NON_CRAN</code>. It would be:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># An envvar cannot be referred to as $(NOT_CRAN)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="dt">NOT_CRAN_ENVVAR </span><span class="ch">=</span><span class="st"> </span><span class="ch">${</span><span class="dt">NOT_CRAN</span><span class="ch">}</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="dv">$(STATLIB):</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="cf">ifeq</span> (<span class="ch">$(</span><span class="dt">NOT_CRAN_ENVVAR</span><span class="ch">)</span>,<span class="st">"true"</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  cargo build <span class="dt">--target</span><span class="ch">=$(</span><span class="dt">TARGET</span><span class="ch">)</span><span class="st"> --lib --release --manifest-path=./rust/Cargo.toml</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">CARGO_HOME</span><span class="ch">=$(</span><span class="dt">PWD</span><span class="ch">)</span><span class="st">/.cargo cargo build --target=</span><span class="ch">$(</span><span class="dt">TARGET</span><span class="ch">)</span><span class="st"> --lib --release --manifest-path=./rust/Cargo.toml</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">CARGO_HOME</span><span class="ch">)</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">LIBDIR</span><span class="ch">)</span>/build</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="cf">endif</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="set-path" class="level3">
+<h3 class="anchored" data-anchor-id="set-path">Set <code>PATH</code></h3>
+<p>One more thing my <code>Makevars</code> (not <code>Makevars.win</code> this time) couldn’t covered was the case when <code>cargo</code> is on <code>PATH</code> but <code>rustc</code> is not. It seems gifski package handles this by including <code>$(HOME)/.cargo/bin</code> in <code>PATH</code> (<a href="https://github.com/r-rust/gifski/blob/6b86cc6b60abbc2294db821f27cae37413df70c2/src/Makevars#L13">Makevars</a>).</p>
+<p>I think sourcing <code>"$(HOME)/.cargo/env"</code> should also work (this actually just sets <code>PATH</code>), so I’ll try this next time. Note that <code>source</code> is not available on dash, so use <code>.</code> for this.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">.</span> <span class="st">"</span><span class="va">$(</span><span class="ex">HOME</span><span class="va">)</span><span class="st">/.cargo/env"</span> <span class="kw">&amp;&amp;</span> <span class="ex">cargo</span> build ...</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Okay, done. Let’s move onto configure scripts.</p>
+</section>
+</section>
+<section id="what-is-a-configure-script" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-a-configure-script">What is a configure script?</h2>
+<p>A configure script is often used for configuring <code>Makefile</code> or <code>Makevars</code>, depending on the user’s setup.</p>
+<p><a href="https://cran.r-project.org/doc/manuals/r-devel/R-exts.html#Configure-and-cleanup">Writing R Extensions</a> says:</p>
+<blockquote class="blockquote">
+<p>If your package needs some system-dependent configuration before installation you can include an executable (Bourne shell script <code>configure</code> in your package which (if present) is executed by <code>R CMD INSTALL</code> before any other action is performed.</p>
+</blockquote>
+<p><code>configure</code> is executed on UNIX-alikes, and Windows uses a different file <code>configure.win</code><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>. Actually, I got this request from CRAN:</p>
+<blockquote class="blockquote">
+<p>By the way, ideally string2path would use configure to test for cargo</p>
+</blockquote>
+<p>So far, I used <code>Makevars.win</code> for testing the existence of <code>cargo</code>, but it seems configure scripts are the better place for this. Moreover, I do want to check the cargo functionality more precisely, for example,</p>
+<ul>
+<li>if the Rust version is not too old to support (“MSRV”)</li>
+<li>(Windows only) if the Rust installation has the required toolchain, <code>stable-msvc</code></li>
+<li>(Windows only) if the Rust installation has the required targets, <code>x86_64-pc-windows-gnu</code> and <code>i686-pc-windows-gnu</code></li>
+</ul>
+<p>but <code>Makevars.win</code> is a bit too narrow to write a complex shell script.</p>
+</section>
+<section id="biarch-true" class="level2">
+<h2 class="anchored" data-anchor-id="biarch-true"><code>Biarch: true</code></h2>
+<p>If we use <code>configure.win</code>, we have to add the following line to <code>DESCRIPTION</code>.</p>
+<pre><code>Biarch: true</code></pre>
+<p>Otherwise, the 32-bit version won’t get built for unknown reason and it makes CRAN angry. This behaviour is found on <a href="https://cran.r-project.org/bin/windows/base/rw-FAQ.html#How-do-I-build-my-package-for-both-32_002d-and-64_002dbit-R_003f">R for Windows FAQ</a>, but it doesn’t explain what we should do. I found this on the following post on RStudio Community.</p>
+<ul>
+<li><a href="https://community.rstudio.com/t/configure-win-and-cran-submission/24684/4" class="uri">https://community.rstudio.com/t/configure-win-and-cran-submission/24684/4</a></li>
+</ul>
+</section>
+<section id="check-cargo" class="level2">
+<h2 class="anchored" data-anchor-id="check-cargo">Check <code>cargo</code></h2>
+<section id="check-cargo-is-installed" class="level3">
+<h3 class="anchored" data-anchor-id="check-cargo-is-installed">Check <code>cargo</code> is installed</h3>
+<p>This is simple.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> version <span class="op">&gt;</span>/dev/null <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="va">$?</span> <span class="ot">-ne</span> 0 <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"cargo command is not available"</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Note that we don’t want to exit here, because the absence of <code>cargo</code> isn’t the end of the world; there might be a precompiled binary for the platform. But, let’s tweak it later.</p>
+</section>
+<section id="check-if-the-rust-version-is-not-too-old-to-support" class="level3">
+<h3 class="anchored" data-anchor-id="check-if-the-rust-version-is-not-too-old-to-support">Check if the Rust version is not too old to support</h3>
+<p>This isn’t always necessary, but we might want to reject the older Rust in the case when we use some feature that is available after the specific version of Rust. You know, comparing versions is tricky. But, this can be archived by <code>sort</code> command with <code>-V</code> option and <code>-C</code> option (c.f. <a href="https://unix.stackexchange.com/a/567537">SO answer</a>). <code>-V</code> means version sort. <code>-C</code> means checking if the input is already sorted, and errors when it’s not. In summary, the implementation is the following:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># c.f. https://github.com/ron-rs/ron/issues/256#issuecomment-657999081</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="va">MIN_RUST_VERSION</span><span class="op">=</span><span class="st">"1.41.0"</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="va">RUST_VERSION</span><span class="op">=</span><span class="st">"</span><span class="kw">`</span><span class="ex">cargo</span> <span class="at">--version</span> <span class="kw">|</span> <span class="fu">cut</span> <span class="at">-d</span><span class="st">' '</span> <span class="at">-f2</span><span class="kw">`</span><span class="st">"</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="ot">! </span><span class="bu">printf</span> <span class="st">'%s\n'</span> <span class="st">"</span><span class="va">${MIN_RUST_VERSION}</span><span class="st">"</span> <span class="st">"</span><span class="va">${RUST_VERSION}</span><span class="st">"</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-C</span> <span class="at">-V</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"The installed version of cargo (</span><span class="va">${RUST_VERSION}</span><span class="st">) is older than the requirement (</span><span class="va">${MIN_RUST_VERSION}</span><span class="st">)"</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>(Btw, did you know we cannot use <code>$(expr)</code> notation in <code>configure</code> because this syntax isn’t available on Solaris? We need to use <code>`expr`</code> instead)</p>
+</section>
+<section id="check-if-the-rust-installation-has-the-required-toolchain-and-targets-windows-only" class="level3">
+<h3 class="anchored" data-anchor-id="check-if-the-rust-installation-has-the-required-toolchain-and-targets-windows-only">Check if the Rust installation has the required toolchain and targets (Windows only)</h3>
+<p>On Windows, extendr provides support only the specified set of toolchain and target. So, we need to check it.</p>
+<p>Checking toolchain is simple. Use <code>+</code> to specify the toolchain.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="va">EXPECTED_TOOLCHAIN</span><span class="op">=</span><span class="st">"stable-msvc"</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> <span class="st">"+</span><span class="va">${EXPECTED_TOOLCHAIN}</span><span class="st">"</span> version <span class="op">&gt;</span>/dev/null <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="va">$?</span> <span class="ot">-ne</span> 0 <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"</span><span class="va">${EXPECTED_TOOLCHAIN}</span><span class="st"> toolchain is not installed"</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Installed targets can be listed by <code>rustup target list --installed</code>. So, the check would be like</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="va">EXPECTED_TARGET</span><span class="op">=</span><span class="st">"x86_64-pc-windows-gnu"</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="ot">! </span><span class="ex">rustup</span> target list <span class="at">--installed</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-q</span> <span class="st">"</span><span class="va">${EXPECTED_TARGET}</span><span class="st">"</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"target </span><span class="va">${EXPECTED_TARGET}</span><span class="st"> is not installed"</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>One thing tricky here is that, unlike <code>Makevars.win</code>, <code>configure.win</code> is executed only once, not per architecture. So, we need to manually enumerate both 64-bit and 32-bit.</p>
+<p>One more tricky thing at the time of writing this is…, you might not notice, the 32-bit version no longer exists in R-devel, which is supposed to be released as R 4.2! So, we want to check 32-bit only when there’s 32-bit. How? I couldn’t come up with some nice way, but it seems check on <code>${R_HOME}/bin/i386/</code> works:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">check_cargo_target()</span> <span class="kw">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">EXPECTED_TARGET</span><span class="op">=</span><span class="st">"</span><span class="va">$1</span><span class="st">"</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="ot">! </span><span class="ex">rustup</span> target list <span class="at">--installed</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-q</span> <span class="st">"</span><span class="va">${EXPECTED_TARGET}</span><span class="st">"</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">echo</span> <span class="st">"target </span><span class="va">${EXPECTED_TARGET}</span><span class="st"> is not installed"</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">exit</span> 1</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">fi</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">}</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="ex">check_cargo_target</span> x86_64-pc-windows-gnu</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">-d</span> <span class="st">"</span><span class="va">${R_HOME}</span><span class="st">/bin/i386/"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  <span class="ex">check_cargo_target</span> i686-pc-windows-gnu</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="but-what-can-we-do" class="level2">
+<h2 class="anchored" data-anchor-id="but-what-can-we-do">But what can we do?</h2>
+<p>Now we can check the <code>cargo</code> installation. But, if the check fails, what should we do? Actually, on CRAN, Windows and macOS machines don’t have Rust installed.</p>
+<p>There are two options.</p>
+<ol type="1">
+<li>Install <code>cargo</code> into the temporary directory</li>
+<li>Download the precompiled binaries (which means you have to serve the binaries on somewhere beforehand).</li>
+</ol>
+<p>For example, the gifski package uses option 1 for macOS and option 2 for Windows. My string2path package now uses option 2 both for macOS and for Windows.</p>
+</section>
+<section id="install-cargo-on-the-fly" class="level2">
+<h2 class="anchored" data-anchor-id="install-cargo-on-the-fly">Install <code>cargo</code> on the fly</h2>
+<p><a href="https://github.com/r-rust/gifski/blob/6b86cc6b60abbc2294db821f27cae37413df70c2/configure#L11-L12">The implementation for macOS</a> is below. The actual process is written in the downloaded script, but what it does is basically downloading <code>cargo</code>.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Try local version on MacOS, otherwise error</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="bu">[</span> <span class="kw">`</span><span class="fu">uname</span><span class="kw">`</span> <span class="ot">=</span> <span class="st">"Darwin"</span> <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="ex">curl</span> <span class="st">"https://autobrew.github.io/scripts/rust"</span> <span class="at">-sSf</span> <span class="kw">|</span> <span class="fu">sh</span> <span class="kw">&amp;&amp;</span> <span class="bu">exit</span> 0</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>I don’t write much about this this time, but <a href="https://cran.r-project.org/package=cargo">cargo package</a> should also be useful for this strategy.</p>
+</section>
+<section id="download-the-precompiled-binaries" class="level2">
+<h2 class="anchored" data-anchor-id="download-the-precompiled-binaries">Download the precompiled binaries</h2>
+<p>This is what was done in <code>Makevars.win</code>.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="dv">$(STATLIB):</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="cf">ifdef</span> CARGO_EXISTS</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    cargo build <span class="dt">--target</span><span class="ch">=$(</span><span class="dt">TARGET</span><span class="ch">)</span><span class="st"> --lib --release --manifest-path=./rust/Cargo.toml</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    mkdir -p <span class="ch">$(</span><span class="dt">LIBDIR</span><span class="ch">)</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    curl -L -o <span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span> https://github.com/yutannihilation/<span class="ch">$(</span><span class="dt">CRATE</span><span class="ch">)</span>/releases/download/<span class="ch">$(</span><span class="dt">BASE_TAG</span><span class="ch">)</span>/<span class="ch">$(</span><span class="dt">TARGET</span><span class="ch">)</span>-lib<span class="ch">$(</span><span class="dt">CRATE</span><span class="ch">)</span>.a</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="cf">endif</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>To move this to <code>configure</code> and <code>configure.win</code>. There are several things to consider. For example:</p>
+<ul>
+<li>As this downloads the binary before <code>$(STATLIB)</code> is executed, we need some tweak to ensure it’s not removed by <code>C_clean</code></li>
+<li>(Windows only) unlike <code>Makevars.win</code> is executed per arch, <code>configure.win</code> is executed only once</li>
+</ul>
+<p>What’s more, I want to make one addition:</p>
+<ul>
+<li>Verify the checksums</li>
+</ul>
+<p>Some might have wondered if it’s safe to download an arbitrary binary from GitHub. First of all, I’d argue it’s safe. To say the least, essentially, it’s no unsafer than downloading a cargo binary itself, (or than “<code>curl URL | sh</code>”). If it’s downloaded over HTTPS, the data hardly gets compromised as long as their servers are not compromised. I believe GitHub servers and Rust servers are both very secure.</p>
+<p>That said, we can improve the security further by “pinning” the binary. So, I recommend verifying the checksum when downloading a binary. For example, <a href="https://github.com/gagolews/stringi/blob/60ac05ecbc71aa49dd1f8137453b0f466728c787/R/install.R#L120">the stringi package does this</a>.</p>
+<section id="makevars.in-and-makevars.win.in" class="level3">
+<h3 class="anchored" data-anchor-id="makevars.in-and-makevars.win.in"><code>Makevars.in</code> and <code>Makevars.win.in</code></h3>
+<p>Remember <code>Makevars.win</code> has these lines (<code>$(STATLIB)</code> is the artifact of the Rust code):</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="dv">all:</span><span class="dt"> C_clean</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="dv">C_clean:</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">SHLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">OBJECTS</span><span class="ch">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Removing <code>$(STATLIB)</code> is needed to invoke <code>cargo build</code> in the case when <code>cargo</code> is installed. Otherwise, <code>$(STATLIB)</code> keeps existing, which means that target is never executed.</p>
+<p>On the other hand, we don’t want to execute <code>cargo build</code> if there’s no <code>cargo</code>. So, in this case, we need to prevent the downloaded binary from getting removed.</p>
+<p>In order to change the logic like this, we can use <code>Makevars.in</code> and <code>Makevars.win.in</code> as a template to generate <code>Makevars</code> and <code>Makevars.win</code> respectively. Generating these files can be done in <code>configure</code> and <code>configure.win</code>. For example,</p>
+<p><code>Makevars.in</code>:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="dv">C_clean:</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    rm -Rf <span class="ch">$(</span><span class="dt">SHLIB</span><span class="ch">)</span> <span class="ch">$(</span><span class="dt">OBJECTS</span><span class="ch">)</span> @CLEAN_EXTRA@</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><code>configure</code>:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode makefile code-with-copy"><code class="sourceCode makefile"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># cargo installed</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>sed -e <span class="st">'s|@CLEAN_EXTRA@|</span><span class="ch">$(</span><span class="dt">STATLIB</span><span class="ch">)</span><span class="st">|'</span> src/Makevars.in &gt; src/Makevars</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co"># no cargo</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>sed -e <span class="st">'s|@CLEAN_EXTRA@||'</span> src/Makevars.in &gt; src/Makevars</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>If we generate <code>Makevars</code> and <code>Makevars.win</code> in configure scripts, we also need to clean up these by the <code>cleanup</code> script (this is required by Writing R Extensions).</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span> <span class="at">-f</span> src/Makevars src/Makevars.win</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Of course, don’t forget to add <code>src/Makevars</code> and <code>src/Makevars.win</code> to <code>.gitignore</code>.</p>
+<p>(Probably, we can generate more sophisticated <code>Makevars</code>, but this time I used only this one replacement.)</p>
+</section>
+<section id="verify-the-checksums" class="level3">
+<h3 class="anchored" data-anchor-id="verify-the-checksums">Verify the checksums</h3>
+<p>To verify the checksum, we can use <code>sha256sum</code> on platforms other than macOS, and <code>shasum -a 256</code> on macOS. For the example of macOS:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="va">SHA256SUM_EXPECTED</span><span class="op">=</span>be65f074cb7ae50e5784e7650f48579fff35f30ff663d1c01eabdc9f35c1f87c</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify the checksum</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="va">SHA256SUM_ACTUAL</span><span class="op">=</span><span class="kw">`</span><span class="ex">shasum</span> <span class="at">-a</span> 256 <span class="st">"</span><span class="va">${DST}</span><span class="st">"</span> <span class="kw">|</span> <span class="fu">cut</span> <span class="at">-d</span><span class="st">' '</span> <span class="at">-f1</span><span class="kw">`</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">-z</span> <span class="st">"</span><span class="va">${SHA256SUM_ACTUAL}</span><span class="st">"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"Failed to get the checksum"</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="st">"</span><span class="va">${SHA256SUM_ACTUAL}</span><span class="st">"</span> <span class="ot">!=</span> <span class="st">"</span><span class="va">${SHA256SUM_EXPECTED}</span><span class="st">"</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">"Checksum mismatch for the pre-compiled binary"</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="most-important-ask-cran-maintainers-to-exclude-solaris" class="level2">
+<h2 class="anchored" data-anchor-id="most-important-ask-cran-maintainers-to-exclude-solaris">[MOST IMPORTANT!] Ask CRAN maintainers to exclude Solaris</h2>
+<p>Oh, sorry, I forgot to enumerate the most important option!</p>
+<ol start="0" type="1">
+<li>Give up</li>
+</ol>
+<p>Because 32-bit Solaris is not a supported platform by Rust, there’s no option other than giving up. I wrote this on cran-comment and it seems this was accepted:</p>
+<blockquote class="blockquote">
+<p>I would like to request to exclude Solaris from the build targets because Solaris is not a supported platform by Rust. This should be in line with the treatments of other CRAN packages that use Rust; gifski, baseflow, and salso are not built on Solaris. I’m sorry that I didn’t write this in the first submission.</p>
+</blockquote>
+<p>Be sure to add some comment like this when you submit an R package with Rust to CRAN!</p>
+</section>
+<section id="example" class="level2">
+<h2 class="anchored" data-anchor-id="example">Example</h2>
+<p>For a real example, please refer to <a href="https://github.com/yutannihilation/string2path">string2path</a>, though your mileage may vary.</p>
+
+
+</section>
+
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>There’s also <a href="https://stat.ethz.ch/pipermail/r-devel/2021-September/081093.html"><code>configure.ucrt</code></a>, but you can forget this for now.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
